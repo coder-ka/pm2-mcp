@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "pm2": {
+      "command": "node",
+      "args": ["./build/index.js"],
+      "env": {},
+      "logLevel": "debug"
+    }
+  }
+}

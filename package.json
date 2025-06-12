@@ -1,54 +1,23 @@
 {
   "type": "module",
-  "name": "esbuild-ts-lib-starter",
-  "version": "1.0.0",
-  "description": "",
-  "bin": "dist/bin.cjs",
-  "main": "./dist/index.cjs",
-  "exports": {
-    ".": {
-      "types": "./types/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.mjs"
-    }
+  "name": "@coder-ka/pm2-mcp",
+  "bin": {
+    "pm2-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod 755 build/index.js"
   },
   "files": [
-    "dist",
-    "types",
-    "package.json"
+    "build"
   ],
-  "scripts": {
-    "build": "tsc && tsx scripts/build.ts",
-    "watch": "concurrently \"tsc --watch\" \"tsx scripts/build.ts -watch\"",
-    "build:node": "tsc && tsx scripts/build-node.ts",
-    "watch:node": "concurrently \"tsc --watch\" \"tsx scripts/build-node.ts -watch\"",
-    "test": "tsx tests"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/coder-ka/esbuild-ts-lib-starter.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/coder-ka/esbuild-ts-lib-starter/issues"
-  },
-  "homepage": "https://github.com/coder-ka/esbuild-ts-lib-starter#readme",
-  "devDependencies": {
-    "@types/assert": "^1.5.10",
-    "@types/node": "^22.5.0",
-    "assert": "^2.1.0",
-    "concurrently": "^8.2.2",
-    "esbuild": "^0.20.2",
-    "estrella": "^1.4.1",
-    "tsx": "^4.9.3",
-    "typescript": "^5.4.5"
-  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "nanoid": "^5.1.5",
     "pm2": "^6.0.8",
     "zod": "^3.25.63"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.1",
+    "typescript": "^5.8.3"
   }
 }

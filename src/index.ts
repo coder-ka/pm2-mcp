@@ -29,31 +29,134 @@ server.tool(
   },
   async ({ script, args = [], cwd }) => {
     return new Promise((resolve, reject) => {
+      const processName = `${namespace}-${nanoid(6)}`;
       pm2.start(
         {
           script,
           args,
           cwd,
-          name: `${namespace}-${nanoid(6)}`,
+          name: processName,
           namespace,
         },
         (err, proc) => {
           if (err) {
             return reject(err);
           }
+          console.error("DEBUG - proc type:", typeof proc);
+          console.error("DEBUG - proc content:", JSON.stringify(proc, null, 2));
+
+          let status = "unknown";
+          if (Array.isArray(proc)) {
+            status = proc[0]?.pm2_env?.status || "unknown";
+          } else if (proc && typeof proc === "object" && "pm2_env" in proc) {
+            status = (proc as any).pm2_env?.status || "unknown";
+          }
+
           resolve({
             content: [
               {
                 type: "text",
-                text: `Process started successfully:\nID: ${
-                  proc.pm_id
-                }\nName: ${proc.name}\nStatus: ${proc.status || "unknown"}`,
+                text: `Process started successfully:\nName: ${processName}\nStatus: ${status}`,
               },
             ],
           });
         }
       );
     });
+  }
+);
+
+server.tool(
+  "delete-process",
+  "Delete/stop a process by name",
+  {
+    name: z.string().describe("Process name to delete"),
+  },
+  async ({ name }) => {
+    return new Promise((resolve, reject) => {
+      pm2.delete(name, (err) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve({
+          content: [
+            {
+              type: "text",
+              text: `Process deleted successfully: ${name}`,
+            },
+          ],
+        });
+      });
+    });
+  }
+);
+
+server.tool(
+  "list-process",
+  "List processes by namespace",
+  {
+    namespace: z.string().describe("Namespace to filter processes"),
+  },
+  async ({ namespace: targetNamespace }) => {
+    return new Promise((resolve, reject) => {
+      pm2.list((err, list) => {
+        if (err) {
+          return reject(err);
+        }
+
+        const filteredProcesses = list.filter((proc) =>
+          proc.name?.startsWith(`${targetNamespace}-`)
+        );
+
+        const processInfo = filteredProcesses.map((proc) => ({
+          name: proc.name,
+          status: proc.pm2_env?.status,
+          pid: proc.pid,
+          cpu: proc.monit?.cpu,
+          memory: proc.monit?.memory,
+          uptime: proc.pm2_env?.pm_uptime,
+          restart_time: proc.pm2_env?.restart_time,
+        }));
+
+        resolve({
+          content: [
+            {
+              type: "text",
+              text: `Processes in namespace '${targetNamespace}':\n${
+                processInfo.length === 0
+                  ? "No processes found"
+                  : processInfo
+                      .map(
+                        (p) =>
+                          `Name: ${p.name}\nStatus: ${p.status}\nPID: ${
+                            p.pid
+                          }\nCPU: ${p.cpu}%\nMemory: ${
+                            p.memory ? (p.memory / 1024 / 1024).toFixed(2) : 0
+                          }MB\nRestart Count: ${p.restart_time}\n`
+                      )
+                      .join("\n")
+              }`,
+            },
+          ],
+        });
+      });
+    });
+  }
+);
+
+server.tool(
+  "get-namespace",
+  "Get the current server namespace",
+  {},
+  async () => {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Current namespace: ${namespace}`,
+        },
+      ],
+    };
   }
 );
 

@@ -11,44 +11,40 @@ This is a PM2 MCP (Model Context Protocol) Server that provides process manageme
 - **MCP Server**: Built using `@modelcontextprotocol/sdk` with stdio transport
 - **Process Management**: Uses PM2 for process lifecycle management  
 - **Namespacing**: Each server instance creates a unique namespace using nanoid to avoid process name conflicts
-- **Build System**: Custom esbuild-based build pipeline using estrella
+- **Build System**: TypeScript compilation with ES2022/Node16 modules
 
 ### Key Components
 
 - `src/index.ts`: Main MCP server implementation with PM2 integration
-- `src/bin.ts`: CLI entry point (currently placeholder)
-- `scripts/`: Build pipeline with both standard and Node.js-specific builds
+  - `start-process` tool: Starts new processes with auto-generated names
+  - `delete-process` tool: Stops/deletes processes by name
 - Process names are automatically generated as `{namespace}-{randomId}` to prevent conflicts
+- Graceful shutdown handling with SIGINT/SIGTERM signal handlers
+- Uses Zod for parameter validation on MCP tools
+
+### Available MCP Tools
+
+1. **start-process**: Start a new process
+   - `script`: The script/command to run
+   - `args`: Optional array of arguments
+   - `cwd`: Optional working directory
+   
+2. **delete-process**: Stop/delete a process
+   - `name`: Process name to delete
 
 ## Development Commands
 
 ```bash
-# Build the project (TypeScript compilation + esbuild bundling)
+# Build the project (TypeScript compilation + chmod)
 npm run build
 
-# Build for Node.js environment specifically  
-npm run build:node
-
-# Watch mode for development
-npm run watch
-
-# Watch mode for Node.js
-npm run watch:node
-
-# Run tests
-npm run test
+# No test script currently defined
 ```
 
 ## Build System Details
 
-The project uses a dual-build approach:
-- TypeScript compiler generates type definitions in `./types/`
-- Custom esbuild pipeline creates bundled outputs in `./dist/` 
-- Supports both CommonJS and ESM formats
-- Creates separate builds for bin and library entry points
-
-Build outputs:
-- `dist/index.cjs` (CommonJS library)
-- `dist/index.mjs` (ESM library) 
-- `dist/bin.cjs` (CLI executable)
-- `types/index.d.ts` (TypeScript definitions)
+- TypeScript compiler generates JavaScript in `./build/`
+- Uses ES2022 target with Node16 module resolution
+- Executable is `build/index.js` with shebang for CLI usage
+- Binary name: `pm2-mcp` (available after npm install -g)
+- Build includes chmod 755 to make executable
