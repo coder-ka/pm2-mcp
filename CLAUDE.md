@@ -38,13 +38,22 @@ This is a PM2 MCP (Model Context Protocol) Server that provides process manageme
 # Build the project (TypeScript compilation + chmod)
 npm run build
 
-# No test script currently defined
+# Debug server with MCP inspector
+npm run inspect
 ```
 
 ## Build System Details
 
 - TypeScript compiler generates JavaScript in `./build/`
-- Uses ES2022 target with Node16 module resolution
+- Uses ES2022 target with Node16 module resolution  
 - Executable is `build/index.js` with shebang for CLI usage
 - Binary name: `pm2-mcp` (available after npm install -g)
 - Build includes chmod 755 to make executable
+
+## Development & Testing
+
+- Uses basic assertion-based testing in `tests/` directory
+- `pm2-example.js` serves as a test process that logs incrementally
+- Logs are written to temp directory (`/tmp/pm2-mcp.log`) with namespace prefixing
+- Each server instance uses unique 6-char namespace to avoid PM2 process conflicts
+- MCP Inspector available via `npm run inspect` for debugging tool interactions

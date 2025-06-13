@@ -1,200 +1,209 @@
+import pm2 from "pm2";
+import { nanoid } from "nanoid";
+import { appendFileSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import pm2 from "pm2";
-import { nanoid } from "nanoid";
-
-// Create server instance
-const server = new McpServer({
-  name: "pm2",
-  version: "1.0.0",
-  capabilities: {
-    resources: {},
-    tools: {},
-  },
-});
 
 const namespace = nanoid(6);
 
-server.tool(
-  "start-process",
-  "Start a new process",
-  {
-    script: z.string().describe("The script to run"),
-    args: z
-      .array(z.string())
-      .optional()
-      .describe("Arguments to pass to the script"),
-    cwd: z.string().optional().describe("Working directory for the script"),
-  },
-  async ({ script, args = [], cwd }) => {
-    return new Promise((resolve, reject) => {
-      const processName = `${namespace}-${nanoid(6)}`;
-      pm2.start(
-        {
-          script,
-          args,
-          cwd,
-          name: processName,
-          namespace,
-        },
-        (err, proc) => {
-          if (err) {
-            return reject(err);
-          }
-          console.error("DEBUG - proc type:", typeof proc);
-          console.error("DEBUG - proc content:", JSON.stringify(proc, null, 2));
+// Log file path - put in temp directory to avoid cluttering current directory
+const logFile = join(tmpdir(), `pm2-mcp.log`);
 
-          let status = "unknown";
-          if (Array.isArray(proc)) {
-            status = proc[0]?.pm2_env?.status || "unknown";
-          } else if (proc && typeof proc === "object" && "pm2_env" in proc) {
-            status = (proc as any).pm2_env?.status || "unknown";
-          }
+// Helper function to log to file
+function log(message: string) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${namespace}] [${timestamp}] ${message}\n`;
+  appendFileSync(logFile, logMessage);
+}
 
-          resolve({
-            content: [
-              {
-                type: "text",
-                text: `Process started successfully:\nName: ${processName}\nStatus: ${status}`,
-              },
-            ],
+function isError(error: unknown): error is Error {
+  return (
+    error instanceof Error ||
+    (typeof error === "object" && error !== null && "message" in error)
+  );
+}
+
+// Helper function to handle PM2 operations with automatic connect/disconnect
+async function withPM2<T>(operation: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    pm2.connect((connectErr) => {
+      if (connectErr) {
+        return reject(connectErr);
+      }
+
+      operation()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          pm2.disconnect();
+        });
+    });
+  });
+}
+
+// Cleanup function to delete all processes in this namespace
+async function cleanup() {
+  await withPM2(async () => {
+    try {
+      const list = await new Promise<pm2.ProcessDescription[]>(
+        (resolve, reject) => {
+          pm2.list((err, list) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(list);
           });
         }
       );
-    });
-  }
-);
 
-server.tool(
-  "delete-process",
-  "Delete/stop a process by name",
-  {
-    name: z.string().describe("Process name to delete"),
-  },
-  async ({ name }) => {
-    return new Promise((resolve, reject) => {
-      pm2.delete(name, (err) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve({
-          content: [
-            {
-              type: "text",
-              text: `Process deleted successfully: ${name}`,
-            },
-          ],
-        });
-      });
-    });
-  }
-);
+      await Promise.all(
+        list
+          .filter((proc) => proc.name && proc.name.startsWith(`${namespace}-`))
+          .map(
+            (proc) =>
+              new Promise<void>((resolve, reject) => {
+                pm2.delete(proc.name!, (deleteErr) => {
+                  if (deleteErr) {
+                    log(
+                      `Error deleting process ${proc.name}: ${deleteErr.message}`
+                    );
+                    return reject(deleteErr);
+                  }
+                  log(`Successfully deleted process ${proc.name}`);
+                  resolve();
+                });
+              })
+          )
+      );
 
-server.tool(
-  "list-process",
-  "List processes by namespace",
-  {
-    namespace: z.string().describe("Namespace to filter processes"),
-  },
-  async ({ namespace: targetNamespace }) => {
-    return new Promise((resolve, reject) => {
-      pm2.list((err, list) => {
-        if (err) {
-          return reject(err);
-        }
-
-        const filteredProcesses = list.filter((proc) =>
-          proc.name?.startsWith(`${targetNamespace}-`)
-        );
-
-        const processInfo = filteredProcesses.map((proc) => ({
-          name: proc.name,
-          status: proc.pm2_env?.status,
-          pid: proc.pid,
-          cpu: proc.monit?.cpu,
-          memory: proc.monit?.memory,
-          uptime: proc.pm2_env?.pm_uptime,
-          restart_time: proc.pm2_env?.restart_time,
-        }));
-
-        resolve({
-          content: [
-            {
-              type: "text",
-              text: `Processes in namespace '${targetNamespace}':\n${
-                processInfo.length === 0
-                  ? "No processes found"
-                  : processInfo
-                      .map(
-                        (p) =>
-                          `Name: ${p.name}\nStatus: ${p.status}\nPID: ${
-                            p.pid
-                          }\nCPU: ${p.cpu}%\nMemory: ${
-                            p.memory ? (p.memory / 1024 / 1024).toFixed(2) : 0
-                          }MB\nRestart Count: ${p.restart_time}\n`
-                      )
-                      .join("\n")
-              }`,
-            },
-          ],
-        });
-      });
-    });
-  }
-);
-
-server.tool(
-  "get-namespace",
-  "Get the current server namespace",
-  {},
-  async () => {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Current namespace: ${namespace}`,
-        },
-      ],
-    };
-  }
-);
-
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  await new Promise<void>((resolve, reject) => {
-    pm2.connect((err) => {
-      if (err) {
-        console.error("Failed to connect to PM2:", err);
-        return reject(err);
-      }
-
-      console.log("Connected to PM2");
-      resolve();
-    });
+      log(
+        `Cleanup complete. All processes with namespace '${namespace}' have been deleted.`
+      );
+    } catch (error) {
+      log(
+        `Error during cleanup: ${
+          isError(error) ? error.message : JSON.stringify(error)
+        }`
+      );
+    }
   });
-  console.error("PM2 MCP Server running on stdio");
 }
 
-process.on("SIGINT", () => {
-  console.log("Received SIGINT, shutting down gracefully...");
-  pm2.disconnect();
-  process.exit(0);
-});
-
-process.on("SIGTERM", () => {
-  console.log("Received SIGTERM, shutting down gracefully...");
-  pm2.disconnect();
-  process.exit(0);
-});
-
-main()
-  .catch((error) => {
-    console.error("Fatal error in main():", error);
-    pm2.disconnect();
-    process.exit(1);
-  })
-  .then(() => {
-    console.log(`Server started successfully with namespace: ${namespace}`);
+async function startServer() {
+  const server = new McpServer({
+    name: "pm2-mcp-server",
+    version: "1.0.0",
   });
+
+  // Define tools
+  server.tool(
+    "start-process",
+    "Start a new process using PM2",
+    {
+      script: z.string().describe("The script or command to run"),
+      args: z
+        .array(z.string())
+        .optional()
+        .describe("Optional array of arguments"),
+      cwd: z.string().optional().describe("Optional working directory"),
+    },
+    async ({ script, args, cwd }) => {
+      const processName = `${namespace}-${nanoid(6)}`;
+
+      await withPM2(async () => {
+        return new Promise<void>((resolve, reject) => {
+          const options: any = {
+            name: processName,
+            script,
+            args: args || [],
+            cwd: cwd || process.cwd(),
+          };
+
+          pm2.start(options, (err) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve();
+          });
+        });
+      });
+
+      log(`Started process: ${processName} (${script})`);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully started process '${processName}' with script: ${script}`,
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "delete-process",
+    "Stop and delete a process by name",
+    {
+      name: z.string().describe("Process name to delete"),
+    },
+    async ({ name }) => {
+      await withPM2(async () => {
+        return new Promise<void>((resolve, reject) => {
+          pm2.delete(name, (err) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve();
+          });
+        });
+      });
+
+      log(`Deleted process: ${name}`);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully deleted process '${name}'`,
+          },
+        ],
+      };
+    }
+  );
+
+  // Create stdio transport
+  const transport = new StdioServerTransport();
+
+  // Connect to the MCP server
+  await server.connect(transport);
+
+  log("MCP server started and listening for requests...");
+}
+
+// Handle graceful shutdown
+process.on("SIGINT", async () => {
+  log("Received SIGINT, cleaning up...");
+  await cleanup();
+  process.exit(0);
+});
+
+process.on("SIGTERM", async () => {
+  log("Received SIGTERM, cleaning up...");
+  await cleanup();
+  process.exit(0);
+});
+
+process.on("beforeExit", async (code) => {
+  log("Process exiting, cleaning up...");
+  await cleanup();
+  process.exit(code);
+});
+
+startServer().catch((error) => {
+  log(`Server error: ${error.message}`);
+  process.exit(1);
+});
