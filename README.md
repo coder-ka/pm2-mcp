@@ -24,7 +24,6 @@ This MCP server provides PM2 process management capabilities through the Model C
 
 - **Process Management**: Start, stop, and list processes using PM2
 - **Namespace Isolation**: Each server instance uses unique namespaces to prevent process name conflicts
-- **Log Management**: Capture and retrieve stdout/stderr from processes
 - **MCP Compliant**: Standard MCP protocol implementation
 
 ## Installation
@@ -70,24 +69,11 @@ npm run start:test-server
 
 4. **get-namespace**: Get current server namespace
 
-5. **get-process-logs**: Get logs for a specific process
-   - `processName`: Name of the process to get logs for
-   - `limit`: Maximum number of log entries to return (default: 50)
-   - `type`: Type of logs to retrieve ("stdout" or "stderr")
-   - `since`: Timestamp to get logs since (Unix timestamp in milliseconds)
-
-6. **get-latest-logs**: Get the latest logs for a specific process
-   - `processName`: Name of the process to get logs for
-   - `count`: Number of latest log entries to return (default: 20)
-
-7. **clear-process-logs**: Clear all logs for a specific process
-   - `processName`: Name of the process to clear logs for
 
 ## Architecture
 
 - **MCP SDK**: Built using `@modelcontextprotocol/sdk` with stdio transport
 - **Process Management**: Uses PM2 for process lifecycle management
-- **Log Management**: JSON-based log storage using lowdb
 - **Build System**: TypeScript compilation with ES2022/Node16 modules
 
 ## License

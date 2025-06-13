@@ -38,6 +38,7 @@ This is a PM2 MCP (Model Context Protocol) Server that provides process manageme
 4. **get-namespace**: Get current server namespace
    - Returns the 6-character namespace for this server instance
 
+
 ## Development Commands
 
 ```bash
@@ -83,14 +84,14 @@ The test suite uses Jest with TypeScript and implements a comprehensive MCP clie
 
 - **Jest Framework**: Modern testing with `ts-jest` for TypeScript compilation
 - **MCP Client Utility**: Reusable client in `tests/utils/mcp-client.ts` for server communication
-- **Test Coverage**: 14 test cases covering all MCP tools, error handling, and process lifecycle
+- **Test Coverage**: Core test cases covering all MCP tools, error handling, and process lifecycle
 - **Namespace Isolation Testing**: Verifies that each server instance operates independently
 - **Process Management Validation**: Tests starting, listing, and deleting processes
 - **Error Boundary Testing**: Validates proper error handling (server returns `isError: true` instead of throwing)
 - **Shutdown Cleanup Testing**: Ensures processes are automatically cleaned up on server termination
 
 ### Test Structure
-- `tests/server.test.ts`: Core functionality tests (basic operations, process management, namespace isolation, error handling, logging)
+- `tests/server.test.ts`: Core functionality tests (basic operations, process management, namespace isolation, error handling)
 - `tests/shutdown.test.ts`: Server shutdown cleanup verification
 - `tests/utils/mcp-client.ts`: Reusable MCP client implementation with `callTool()` helper
 - `tests/pm2-example.js`: Simple test process that outputs incrementally
@@ -104,7 +105,7 @@ The test suite uses Jest with TypeScript and implements a comprehensive MCP clie
 
 ## Logging & Debugging
 
-- Logs written to `/tmp/pm2-mcp.log` with namespace prefixing for isolation
+- Server logs written to `/tmp/pm2-mcp.log` with namespace prefixing for isolation
 - Each server instance uses unique 6-char namespace to avoid PM2 process conflicts  
 - MCP Inspector available via `npm run inspect` for debugging tool interactions
 - Server includes comprehensive error handling with proper MCP error responses
