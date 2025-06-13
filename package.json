@@ -6,7 +6,9 @@
   },
   "scripts": {
     "build": "tsc && chmod 755 build/index.js",
-    "inspect": "npx @modelcontextprotocol/inspector node build/index.js"
+    "inspect": "npx @modelcontextprotocol/inspector node build/index.js",
+    "start:test-server": "node tests/pm2-example.js",
+    "test": "npm run build && jest"
   },
   "files": [
     "build"
@@ -19,7 +21,11 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.14.0",
+    "@types/jest": "^29.5.14",
     "@types/node": "^24.0.1",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.4.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }

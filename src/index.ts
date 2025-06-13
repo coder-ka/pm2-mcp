@@ -175,6 +175,80 @@ async function startServer() {
     }
   );
 
+  server.tool(
+    "list-processes",
+    "List PM2 processes, optionally filtered by namespace",
+    {
+      namespace: z.string().optional().describe("Optional namespace to filter processes (if not provided, shows all processes)"),
+    },
+    async ({ namespace: filterNamespace }) => {
+      const processes = await withPM2(async () => {
+        return new Promise<pm2.ProcessDescription[]>((resolve, reject) => {
+          pm2.list((err, list) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(list);
+          });
+        });
+      });
+
+      const filteredProcesses = filterNamespace 
+        ? processes.filter(proc => proc.name && proc.name.startsWith(`${filterNamespace}-`))
+        : processes;
+
+      const processInfo = filteredProcesses.map(proc => ({
+        name: proc.name || 'unnamed',
+        status: proc.pm2_env?.status || 'unknown',
+        pid: proc.pid || 'N/A',
+        cpu: proc.monit?.cpu || 0,
+        memory: proc.monit?.memory || 0,
+        uptime: proc.pm2_env?.pm_uptime ? Date.now() - proc.pm2_env.pm_uptime : 0,
+        script: proc.pm2_env?.pm_exec_path || 'N/A'
+      }));
+
+      const logMessage = filterNamespace 
+        ? `Listed ${filteredProcesses.length} processes for namespace '${filterNamespace}'`
+        : `Listed ${processes.length} processes (all)`;
+      log(logMessage);
+
+      const processTable = processInfo.map(proc => 
+        `${proc.name.padEnd(20)} | ${proc.status.padEnd(10)} | PID: ${String(proc.pid).padEnd(8)} | CPU: ${proc.cpu}% | Memory: ${Math.round(proc.memory / 1024 / 1024)}MB | Uptime: ${Math.round(proc.uptime / 1000)}s`
+      ).join('\n');
+
+      const titleText = filterNamespace 
+        ? `PM2 Processes for namespace '${filterNamespace}' (${filteredProcesses.length} total)`
+        : `PM2 Processes (${processes.length} total)`;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${titleText}:\n\n${processTable || 'No processes running'}`,
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "get-namespace",
+    "Get the current server namespace",
+    {},
+    async () => {
+      log(`Namespace requested: ${namespace}`);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Current server namespace: ${namespace}`,
+          },
+        ],
+      };
+    }
+  );
+
   // Create stdio transport
   const transport = new StdioServerTransport();
 
